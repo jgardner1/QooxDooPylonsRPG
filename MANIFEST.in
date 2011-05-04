@@ -1,0 +1,3 @@
+include rpg/config/deployment.ini_tmpl
+recursive-include rpg/public *
+recursive-include rpg/templates *
