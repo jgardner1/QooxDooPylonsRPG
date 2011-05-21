@@ -1,0 +1,102 @@
+@import url("http://fonts.googleapis.com/css?family=Sigmar+One");
+
+body, td {
+  color: #444444;
+}
+
+html {
+  background: #d1c497;
+}
+
+body {
+  margin: 0 5%;
+}
+
+h1 {
+    font-family: 'Sigmar One', arial, sans-serif;
+    font-size: 
+}
+
+#console, #room {
+  border: 2px solid #444;
+  color: #888888;
+  background: #ffffff;
+  margin: 0;
+  overflow: auto;
+}
+
+#room {
+    padding: 10px;
+    height: 260px;
+}
+
+#sidebar {
+    height: 284px;
+}
+
+#sidebar .yui3-tabview-list {
+    border-bottom: 2px solid #444;
+    /* height: 30px; */
+}
+
+#sidebar .yui3-tab {
+    margin-right: 0.2em;
+    background-color: #ccc;
+}
+
+#sidebar .yui3-tab-label {
+    border-style: solid;
+    border-color: #444;
+    border-width: 2px 2px 0;
+    padding: 6px 10px;
+    color: #444;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+#sidebar .yui3-tab-selected {
+    margin-bottom: -2px;
+    background-color: #fff;
+}
+
+#sidebar .yui3-tab-selected .yui3-tab-label {
+    padding-bottom: 8px;
+}
+
+.yui3-tab-label:focus {
+    outline: none;
+}
+
+#sidebar .yui3-tabview-panel {
+    overflow: auto;
+    height: 230px;
+    padding: 10px;
+    background-color: #fff;
+    border-width: 0px 2px 2px;
+    border-style: solid;
+    border-color: #444;
+}
+
+#console {
+  white-space: pre;
+  padding: 10px;
+  height: 130px;
+  font-family: "Courier New","Courier",monospace;
+}
+
+#inventory {
+  max-height: 10em;
+}
+
+table.vertical th {
+  text-align: right;
+
+}
+
+table.vertical th, .vertical td {
+  vertical-align: top;
+}
+
+table.no-border th, .no-border td {
+  border: none;
+}
