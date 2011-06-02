@@ -14,15 +14,17 @@ body {
 
 h1 {
     font-family: 'Sigmar One', arial, sans-serif;
-    font-size: 
+}
+h1,h2,h3,h4,h5,h6 {
+  margin-top: 0;
 }
 
 #console, #room {
-  border: 2px solid #444;
-  color: #888888;
-  background: #ffffff;
-  margin: 0;
-  overflow: auto;
+    border: 2px solid #444;
+    color: #888888;
+    background: #ffffff;
+    margin: 0;
+    overflow: auto;
 }
 
 #room {
@@ -99,4 +101,39 @@ table.vertical th, .vertical td {
 
 table.no-border th, .no-border td {
   border: none;
+}
+
+.popup {
+  position: absolute;
+  background: white;
+  border: 1px solid #444;
+  border-radius: 1em;
+  box-shadow: 8px 8px 8px #444;
+  padding: 1em;
+}
+
+.options ul {
+  margin: 0;
+  padding: 0;
+}
+
+.options ul li {
+  list-style: none;
+  margin: 4px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  color: #0000ff;
+}
+
+ul#room-exits, ul#room-contents {
+  padding: 0;
+  margin: 0;
+}
+
+ul#room-exits li, ul#room-contents li {
+  list-style: none;
+  margin: 4px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  color: #0000ff;
 }

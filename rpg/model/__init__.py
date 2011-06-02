@@ -9,19 +9,21 @@ def init_model(engine):
 from rpg.model.guid import GUID
 from sqlalchemy import Column, ForeignKey
 from sqlalchemy.types import String, Unicode, Integer, Float, Binary, DateTime, Boolean
+from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm.collections import mapped_collection
 
 from os import urandom
 from hashlib import sha256
+from uuid import uuid4
 
 def gen_password_sha256(salt, password):
     """Returns the password_sha256 given salt and password"""
-    return sha256(self.salt+password).digest()
+    return sha256(salt+str(password)).digest()
 
 class Account(Base):
     __tablename__ = 'accounts'
 
-    id = Column(GUID, primary_key=True)
-    name = Column(Unicode)
+    id = Column(GUID, primary_key=True, default=uuid4)
     email = Column(Unicode)
     salt = Column(Binary(20))
     password_sha256 = Column(Binary(256/8))
@@ -32,34 +34,81 @@ class Account(Base):
 
     password = property(None, _set_password, None)
 
-class Room(Base):
-    __tablename__ = 'rooms'
+    def check_password(self, password):
+        return gen_password_sha256(self.salt, password) == \
+            self.password_sha256
 
-    id = Column(GUID, primary_key=True)
+    @staticmethod
+    def find_account(email, password):
+        for account in meta.Session.query(Account)\
+                .filter(Account.email == email):
+            if account.check_password(password):
+                return account
+
+        raise ValueError("no such account")
+
+    def __json__(self):
+        return dict(
+            email=self.email,
+            mobs=self.mobs,
+        )
+
+class MudObj(Base):
+    __tablename__ = 'mudobjs'
+
+    id = Column(GUID, primary_key=True, default=uuid4)
+    account_id = Column(GUID, ForeignKey('accounts.id'))
+
     name = Column(Unicode)
-    description = Column(Unicode) # Limited HTML
-
-class Exit(Base):
-    __tablename__ = 'exits'
-
-    direction = Column(Unicode, primary_key=True, nullable=False)
     description = Column(Unicode)
-    from_room_id = Column(GUID, ForeignKey('rooms.id'), primary_key=True, nullable=False)
-    to_room_id = Column(GUID, ForeignKey('rooms.id'), nullable=False)
 
-class Mob(Base):
-    __tablename__ = 'mobs'
+    # Rooms, bags, etc...
+    container_id = Column(GUID, ForeignKey('mudobjs.id'))
 
-    id = Column(GUID, primary_key=True)
-    name = Column(Unicode)
-    account_id = Column(GUID, ForeignKey(Account.id))
+    # Exits
+    direction = Column(Unicode)
+    source_id = Column(GUID, ForeignKey('mudobjs.id'))
+    dest_id = Column(GUID, ForeignKey('mudobjs.id'))
 
-class Item(Base):
-    __tablename__ = 'items'
+    # Mobs
+    god = Column(Boolean)
+    ai = Column(String)
 
-    id = Column(GUID, primary_key=True)
+    def __json__(self, contents=False):
+        return dict(
+            id=self.id,
+            name=self.name,
+            description=self.description)
+
+
+MudObj.account = relationship(Account,
+    backref=backref('mobs',
+        collection_class=mapped_collection(lambda o: str(o.id))))
+
+MudObj.contents = relationship(MudObj,
+    primaryjoin=MudObj.container_id==MudObj.id,
+    backref=backref('container', remote_side=MudObj.id))
+
+MudObj.dest = relationship(MudObj,
+    remote_side=[MudObj.id],
+    foreign_keys=[MudObj.dest_id],
+    primaryjoin=MudObj.dest_id==MudObj.id)
+
+MudObj.exits = relationship(MudObj,
+    primaryjoin=MudObj.source_id==MudObj.id)
+    
+
+class Universe(Base):
+    __tablename__ = 'universes'
+
+    id = Column(String, primary_key=True)
+
     name = Column(Unicode)
     description = Column(Unicode)
-    containing_item = Column(GUID, ForeignKey('items.id'))
-    containing_room = Column(GUID, ForeignKey(Room.id))
-    containing_mob = Column(GUID, ForeignKey(Mob.id))
+
+    starting_room_id = Column(GUID, ForeignKey(MudObj.id), nullable=False)
+    starting_room = relationship(MudObj)
+
+    def __init__(self, id, starting_room):
+        self.id = id
+        self.starting_room = starting_room

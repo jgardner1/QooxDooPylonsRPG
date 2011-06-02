@@ -1,2 +1,3 @@
 Pylons>=1.0
 SQLAlchemy>=0.5
+prototype

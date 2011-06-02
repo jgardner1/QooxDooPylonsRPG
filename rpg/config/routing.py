@@ -20,6 +20,8 @@ def make_map(config):
 
     # CUSTOM ROUTES HERE
 
+    map.connect('/svc/{method}.{format}', controller='svc', action='handle')
+
     map.connect('/{controller}/{action}')
     map.connect('/{controller}/{action}/{id}')
 
