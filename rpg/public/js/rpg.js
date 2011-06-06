@@ -48,30 +48,13 @@ YUI().use('anim', 'transition', 'oop', 'event-key', 'base', 'node', 'event', 'ev
         return new ServiceRequest(method, args);
     };
 
-    var room, status, console, input, go,
+    var room, status, input, go,
         current_mob, current_account;
     var init = function() {
         room = Y.one('#room');
         account = Y.one('#account');
         status = Y.one('#status');
         inventory = Y.one('#inventory');
-        console = Y.one('#console');
-        input = Y.one('#input');
-        input.set('value', '');
-
-        Y.on('success', function(response, method, args) {
-        });
-        Y.on('exception', function(exception, method, args) {
-            console.append('<div class="exception">'+exception.name+': '+exception.message+
-                '<br/>Traceback: '+exception.traceback+'</div>');
-        });
-
-        input.on('key', function(event) {
-            var cmd = input.get('value');
-            console.append('<div class="input">'+cmd+'</div>');
-            input.set('value', '');
-            call_svc('do', {cmd:cmd});
-        }, 'down:13');
 
         Y.one('#register-button').on('click', register_clicked);
         Y.one('#login-button').on('click', login_clicked);
@@ -283,7 +266,7 @@ YUI().use('anim', 'transition', 'oop', 'event-key', 'base', 'node', 'event', 'ev
         } else {
             exits_ul.empty();
             Y.each(exits, function(exit) {
-                exits_ul.append(Y.Node.create('<li>'+exit.direction+'</li>'));
+                exits_ul.append(Y.Node.create('<li>'+exit.name+'</li>'));
             });
             no_exits.hide();
             exits_ul.show();
