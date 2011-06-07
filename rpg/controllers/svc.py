@@ -91,9 +91,6 @@ class SvcController(BaseController):
 from rpg.model import meta, Account, MudObj, Universe
 
 class RPGSession(object):
-    def __init__(self, session):
-        self.session = session
-
     @property
     def account(self):
         try:
@@ -122,7 +119,6 @@ class RPGSession(object):
 
     @mob.setter
     def mob(self, mob):
-        session.clear()
         session['mob_id'] = mob.id
         session.save()
 
@@ -131,7 +127,7 @@ class RPGSession(object):
         del session['mob_id']
         session.save()
 
-rpg_session = RPGSession(session)
+rpg_session = RPGSession()
 
 class Service(object):
     @staticmethod
