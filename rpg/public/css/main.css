@@ -126,3 +126,15 @@ table.no-border th, .no-border td {
   text-decoration: underline;
   color: #0000ff;
 }
+
+.title {
+    font-size: 125%;
+    font-weight: bold;
+    margin-bottom: 16px;
+}
+
+.title .id {
+    font-size: 85%;
+    color: #444;
+    font-weight: normal;
+}
