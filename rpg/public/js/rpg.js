@@ -1,6 +1,10 @@
 var switch_character,
     logout;
-YUI().use('anim', 'transition', 'oop', 'event-key', 'base', 'node', 'event', 'event-custom', 'io', 'json', function(Y) {
+YUI().use(
+    'anim', 'transition', 'oop', 'event-key', 'base', 'node', 'event',
+    'event-custom', 'io', 'json',
+    'widget-position', 'widget-position-constrain',
+function(Y) {
 
     var Ycreate = Y.Node.create;
 
@@ -48,8 +52,7 @@ YUI().use('anim', 'transition', 'oop', 'event-key', 'base', 'node', 'event', 'ev
         return new ServiceRequest(method, args);
     };
 
-    var room, status, input, go,
-        current_mob, current_account;
+    var room, status, input, current_mob, current_account;
     var init = function() {
         room = Y.one('#room');
         account = Y.one('#account');
@@ -257,109 +260,197 @@ YUI().use('anim', 'transition', 'oop', 'event-key', 'base', 'node', 'event', 'ev
     };
 
     var show_exits = function(exits) {
-        var exits_ul = Y.one('#room-exits');
+        var exits_div = Y.one('#room-exits');
         var no_exits = Y.one('#room-no-exits');
 
         if (exits.length == 0) {
-            exits_ul.hide();
+            exits_div.hide();
             no_exits.show();
         } else {
-            exits_ul.empty();
+            exits_div.empty();
             Y.each(exits, function(exit) {
-                exits_ul.append(Y.Node.create('<li>'+exit.name+'</li>'));
+                exits_div.append(div(null, span({
+                    class:'action',
+                    title:exit.description || '',
+                    on:{click:function(e){
+                        show_options(exit, [e.pageX, e.pageY], true);
+                    }},
+                }, exit.name || 'unnamed exit')));
             });
             no_exits.hide();
-            exits_ul.show();
+            exits_div.show();
         }
     };
 
     var show_contents = function(contents) {
-        var contents_ul = Y.one('#room-contents');
+        var contents_div = Y.one('#room-contents');
         var no_contents = Y.one('#room-no-contents');
 
         if (contents.length == 0) {
-            contents_ul.hide();
+            contents_div.hide();
             no_contents.show();
         } else {
-            contents_ul.empty();
+            contents_div.empty();
             Y.each(contents, function(item) {
-                contents_ul.append(li({
+                contents_div.append(div(null, span({
+                    class:'action',
+                    title:item.description || '',
                     on:{click:function(e) {
-                        e.halt();
-                        show_options(item, e.pageX, e.pageY);
+                        show_options(item, [e.pageX, e.pageY], true);
                     }}
-                }, item.name));
+                }, item.name || 'unnamed object')));
             });
             no_contents.hide();
-            contents_ul.show();
+            contents_div.show();
         }
     };
 
-    var show_options = function(mudobj, x, y) {
-        var options_div = div({class:'popup options'});
-        Y.one('body').append(options_div);
-        options_div.setContent('<h4>Options:</h4>');
-        options = [
-            ['examin', 'Inspect the target more fully',
-            function() {
-                call_svc('examine', {target:mudobj.id});
-                close();
-            }],
-            ['attack', 'Engage the target in combat to the death',
-            function() {
-                call_svc('attack', {target:mudobj.id});
-                close();
-            }],
-            ['capture', 'Attempt to subdue the target',
-            function() {
-                call_svc('subdue', {target:mudobj.id});
-                close();
-            }],
-            ['pickpocket', 'See what you can take from the target without being noticed',
-            function() {
-                call_svc('pickpocket', {target:mudobj.id});
-                close();
-            }],
-            
-        ];
-        var option_lis = [];
-        options_div.append(ul(null,
-            li({
-                title:'Engage the target in combat to the death',
-                on:{click:function() {
-                    call_svc('attack', {target:mudobj.id});
-                    close();
-                }}
-            }, 'attack'),
-            li({
-                title:'Examine the target more fully',
-                on:{click:function() {
-                    call_svc('examine', {target:mudobj.id});
-                    close();
-                }}
-            }, 'examine'),
-            li({title:'See what you can sneak from the target\'s pockets'}, 'pickpocket'),
-            li({title:'Attempt to subdue the target non-lethally'}, 'capture')));
-
-        options_div.show(true);
-        options_div.setX(x);
-        options_div.setY(y);
-
-        var close = function() {
-            outside_click.detach();
-            options_div.remove(true);
-        };
-
-        var outside_click = Y.on('click', function(e) {
-            var clickTarget = e.target;
-            if (clickTarget!==options_div && !clickTarget.ancestor(function(parentNode) {
-                return parentNode._yuid === options_div._yuid;
-            })) {
-                close();
-            }       
-        }, document);
+    var options_popup;
+    var show_options = function(mudobj, xy, constraint) {
+        if (!options_popup) {
+            options_popup = new OptionsPopup({});
+            options_popup.render();
+        }
+        options_popup.set('mudobj', mudobj);
+        options_popup.show();
+        options_popup.set('xy', xy);
+        options_popup.constrain(xy, true, constraint)
     };
 
+    var repeat = function(val) {
+        return function() {
+            return val;
+        }
+    };
+    var repeat_true = repeat(true);
 
+    var is_exit = function(o) {
+        return o.dest_id && o.source_id;
+    };
 
+    var is_admin = function() {
+        return current_mob.god;
+    };
+
+    var action = function(name, description, test, action) {
+        return {
+            name: name,
+            description: description,
+            test: test,
+            action: action
+        };
+    };
+
+    var go = action(
+        'go',
+        function(o) {
+            return "go "+o.name;
+        },
+        is_exit,
+        function(o) {
+            alert('go');
+        });
+
+    var examine = action(
+        'examine',
+        function(o) {
+            return "Examine "+o.name+" more closely";
+        },
+        repeat_true,
+        function(o) {
+            alert('examine');
+        });
+
+    var clone = action(
+        'clone',
+        function(o) {
+            return "Create a clone of "+o.name;
+        },
+        is_admin,
+        function(o) {
+            alert('clone');
+        });
+
+    var destroy = action(
+        'destroy',
+        function(o) {
+            return "Destroy this";
+        },
+        is_admin,
+        function(o) {
+            alert('destroy');
+        });
+
+    var edit = action(
+        'edit',
+        function(o) {
+            return "Edit this";
+        },
+        is_admin,
+        function(o) {
+            alert('edit');
+        });
+
+    var OptionsPopup = Y.Base.create('options-popup', Y.Widget,
+        [Y.WidgetPosition, Y.WidgetPositionConstrain], {
+            actions: [ go, examine, clone, destroy, edit ],
+
+            initializer: function(config) {
+                this.after('mudobjChange', this.syncUI);
+                this.after('visibleChange', this._afterVisibleChange);
+            },
+
+            _afterVisibleChange: function() {
+                if (this.get('visible')) {
+                    var self = this;
+                    var cb = this.get('contentBox');
+                    this._outside_click = cb.get('ownerDocument').on('mousedown',
+                        function(e) {
+                            var t = e.target;
+                            if (!t.compareTo(cb) && !cb.contains(t)) {
+                                self.hide();
+                            }       
+                        });
+                } else {
+                    this._outside_click.detach();
+                }
+            },
+
+            destructor: function() {
+                this._outside_click.detach();
+            },
+
+            renderUI: function() {
+                var self = this;
+            },
+
+            bindUI: function() {
+                this._afterVisibleChange();
+            },
+
+            syncUI: function() {
+                var self = this;
+                var o = this.get('mudobj')
+                var cb = this.get('contentBox');
+                cb.empty();
+                if (o) {
+                    Y.each(this.actions, function(action) {
+                        if (action.test(o)) {
+                            cb.append(div({class:'option'},
+                                span({
+                                    title:action.description(o),
+                                    class:'action',
+                                    on:{click:function() {
+                                        action.action(o);
+                                        self.hide();
+                                    }}}, action.name)));
+                        }
+                    });
+                }
+            }
+        }, {
+            ATTRS: {
+                mudobj: {}
+            }
+        });
 });

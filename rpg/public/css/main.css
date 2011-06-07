@@ -103,36 +103,22 @@ table.no-border th, .no-border td {
   border: none;
 }
 
-.popup {
-  position: absolute;
-  background: white;
-  border: 1px solid #444;
-  border-radius: 1em;
-  box-shadow: 8px 8px 8px #444;
-  padding: 1em;
+.yui3-options-popup-hidden {
+    display: none;
 }
 
-.options ul {
-  margin: 0;
-  padding: 0;
+.yui3-options-popup {
+    position:absolute;
+}
+.yui3-options-popup-content {
+    background: white;
+    border: 1px solid #444;
+    border-radius: 1em;
+    box-shadow: 8px 8px 8px #444;
+    padding: 1em;
 }
 
-.options ul li {
-  list-style: none;
-  margin: 4px 0;
-  cursor: pointer;
-  text-decoration: underline;
-  color: #0000ff;
-}
-
-ul#room-exits, ul#room-contents {
-  padding: 0;
-  margin: 0;
-}
-
-ul#room-exits li, ul#room-contents li {
-  list-style: none;
-  margin: 4px 0;
+.action {
   cursor: pointer;
   text-decoration: underline;
   color: #0000ff;

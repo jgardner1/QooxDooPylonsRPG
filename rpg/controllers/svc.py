@@ -128,15 +128,10 @@ class Service(object):
     def get_mob_account():
         result = {}
 
-        account = session.get('account')
-        if account:
-            result['account'] = meta.Session.merge(account, True)
-
-            mob = session.get('mob')
-            if mob:
-                result['mob'] = meta.Session.merge(mob, True)
-
-        result['session'] = session
+        if 'account' in session:
+            result['account'] = meta.Session.merge(session.get('account'))
+            if 'mob' in session:
+                result['mob'] = meta.Session.merge(session.get('mob'))
 
         return result
 
@@ -159,7 +154,10 @@ class Service(object):
         mob = MudObj()
         mob.account = account
         mob.name = name
-        mob.container = meta.Session.query(Universe).get('main').starting_room
+        mob.container = meta.Session.query(Universe).get('main').starting_world
+        mob.size = 2.0
+        mob.x = 0.0
+        mob.y = 0.0
         meta.Session.add(mob)
         meta.Session.commit()
 
@@ -188,23 +186,7 @@ class Service(object):
         mob = meta.Session.merge(session['mob'])
 
         room = mob.container
-        if not room:
-            return dict(
-                id=uuid4(),
-                name='Limbo',
-                description='''You are caught in the space where nothing is
-nothing. You are all alone in the nothingness.''',
-                contents=dict(),
-                exits= dict(),
-            )
-
-        return dict(
-            id=uuid4(),
-            name= room.name,
-            description= room.description,
-            contents= room.contents,
-            exits= room.exits,
-        )
+        return room.__json__(show=set(('contents', 'exits')))
 
 
     @staticmethod

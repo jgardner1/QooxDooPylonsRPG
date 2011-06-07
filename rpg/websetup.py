@@ -4,7 +4,7 @@ import logging
 import pylons.test
 
 from rpg.config.environment import load_environment
-from rpg.model import Universe, MudObj, meta
+from rpg.model import Universe, MudObj, meta, populate_schema
 
 log = logging.getLogger(__name__)
 
@@ -17,11 +17,6 @@ def setup_app(command, conf, vars):
     # Create the tables if they don't already exist
     meta.Base.metadata.create_all(bind=meta.Session.bind)
 
-    if meta.Session.query(Universe).count() == 0:
-        starting_room = MudObj()
-        starting_room.name = 'Starting Room'
-        starting_room.description = "This is the starting room"
-        universe = Universe('main', starting_room)
-        meta.Session.add(universe)
+    # Populate the schema with the initial objects.
+    populate_schema()
 
-    meta.Session.commit()
