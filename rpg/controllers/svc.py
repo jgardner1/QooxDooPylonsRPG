@@ -90,35 +90,48 @@ class SvcController(BaseController):
 
 from rpg.model import meta, Account, MudObj, Universe
 
+class RPGSession(object):
+    def __init__(self, session):
+        self.session = session
 
-def clear_current_account(account):
-    session.clear()
-    session.save()
+    @property
+    def account(self):
+        try:
+            return meta.Session.query(Account).get(session['account_id'])
+        except KeyError:
+            raise AttributeError("account is not set")
 
-def set_current_account(account):
-    session['account_id'] = account.id
-    session.save()
 
-def get_current_account():
-    return meta.Session.query(Account).get(session['account_id'])
+    @account.setter
+    def account(self, account):
+        session.clear()
+        session['account_id'] = account.id
+        session.save()
 
-def has_current_account():
-    return 'account_id' in session
+    @account.deleter
+    def account(self):
+        session.clear()
+        session.save()
 
-def clear_current_mob():
-    del session['mob_id']
-    session.save()
+    @property
+    def mob(self):
+        try:
+            return meta.Session.query(MudObj).get(session['mob_id'])
+        except KeyError:
+            raise AttributeError("mob is not set")
 
-def set_current_mob(mob):
-    session.clear()
-    session['account_id'] = mob.id
-    session.save()
+    @mob.setter
+    def mob(self, mob):
+        session.clear()
+        session['mob_id'] = mob.id
+        session.save()
 
-def get_current_mob():
-    return meta.Session.query(MudObj).get(session['mob_id'])
+    @mob.deleter
+    def mob(self):
+        del session['mob_id']
+        session.save()
 
-def has_current_mob():
-    return 'mob_id' in session
+rpg_session = RPGSession(session)
 
 class Service(object):
     @staticmethod
@@ -131,43 +144,44 @@ class Service(object):
         meta.Session.add(account)
         meta.Session.commit()
 
-        set_current_account(account)
+        rpg_session.account = account
 
         return account
 
     @staticmethod
     def login(email, password):
         account = Account.find_account(email, password)
-        set_current_account(account)
+        rpg_session.account = account
 
         return account
 
     @staticmethod
     def logout():
-        clear_current_account()
+        del rpg_session.account
         return True
 
     @staticmethod
     def get_mob_account():
         result = dict()
 
-        if has_current_account():
-            result['account'] = get_current_account()
-            if has_current_mob():
-                result['mob'] = get_current_mob()
+        try:
+            result['account'] = rpg_session.account
+            result['mob'] = rpg_session.mob
+        except AttributeError:
+            pass
 
         return result
 
     @staticmethod
     def choose_mob(mob_id):
-        account = get_current_account()
+        account = rpg_session.account
         mob = account.mobs[mob_id]
-        set_current_mob(mob)
+        rpg_session.mob = mob
         return mob
 
     @staticmethod
     def logout_mob():
-        clear_current_mob()
+        del rpg_session.mob
         return True
 
     @staticmethod
@@ -184,17 +198,17 @@ class Service(object):
         meta.Session.add(mob)
         meta.Session.commit()
 
-        set_current_mob(mob)
+        rpg_session.mob = mob
 
         return mob
             
     @staticmethod
     def status():
-        return get_current_mob()
+        return rpg_session.mob
 
     @staticmethod
     def update(id, **attrs):
-        mob = get_current_mob()
+        mob = rpg_session.mob
         if not mob.god:
             raise Exception("you are not god")
         o = meta.Session.query(MudObj).get(id)
@@ -206,7 +220,7 @@ class Service(object):
     def look():
         """Looks at the room the character is in. Note that the IDs are not
         the actual DB IDs."""
-        mob = get_current_mob()
+        mob = rpg_session.mob
 
         room = mob.container
         return room.__json__(show=set(('contents', 'exits')))
@@ -218,7 +232,7 @@ class Service(object):
 
     @staticmethod
     def create(**attrs):
-        mob = get_current_mob()
+        mob = rpg_session.mob
         if not mob.god:
             raise Exception("you are not a god")
         new_mob = MudObj(**attrs)
@@ -228,9 +242,7 @@ class Service(object):
 
     @staticmethod
     def go(exit_id):
-        mob = get_current_mob()
+        mob = rpg_session.mob
         mob.go(UUID(exit_id))
         meta.Session.commit()
         return True
-        
-        
