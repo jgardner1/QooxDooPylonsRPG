@@ -90,66 +90,89 @@ class SvcController(BaseController):
 
 from rpg.model import meta, Account, MudObj, Universe
 
+
+def clear_current_account(account):
+    session.clear()
+    session.save()
+
+def set_current_account(account):
+    session['account_id'] = account.id
+    session.save()
+
+def get_current_account():
+    return meta.Session.query(Account).get(session['account_id'])
+
+def has_current_account():
+    return 'account_id' in session
+
+def clear_current_mob():
+    del session['mob_id']
+    session.save()
+
+def set_current_mob(mob):
+    session.clear()
+    session['account_id'] = mob.id
+    session.save()
+
+def get_current_mob():
+    return meta.Session.query(MudObj).get(session['mob_id'])
+
+def has_current_mob():
+    return 'mob_id' in session
+
 class Service(object):
     @staticmethod
     def register(email, password):
-        session.clear()
 
         account = Account()
         account.email = email
         account.password = password
 
-        session['account'] = account
-        session.save()
-
         meta.Session.add(account)
         meta.Session.commit()
+
+        set_current_account(account)
 
         return account
 
     @staticmethod
     def login(email, password):
-        session.clear()
-
         account = Account.find_account(email, password)
-
-        session['account'] = account
-        session.save()
+        set_current_account(account)
 
         return account
 
     @staticmethod
     def logout():
-        session.clear()
-        session.save()
+        clear_current_account()
         return True
 
     @staticmethod
     def get_mob_account():
-        result = {}
+        result = dict()
 
-        if 'account' in session:
-            result['account'] = meta.Session.merge(session.get('account'))
-            if 'mob' in session:
-                result['mob'] = meta.Session.merge(session.get('mob'))
+        if has_current_account():
+            result['account'] = get_current_account()
+            if has_current_mob():
+                result['mob'] = get_current_mob()
 
         return result
 
     @staticmethod
     def choose_mob(mob_id):
-        session['mob'] = meta.Session.merge(session['account']).mobs[mob_id]
-        session.save()
-        return session['mob']
+        account = get_current_account()
+        mob = account.mobs[mob_id]
+        set_current_mob(mob)
+        return mob
 
     @staticmethod
     def logout_mob():
-        del session['mob']
-        sesson.save()
+        clear_current_mob()
         return True
 
     @staticmethod
     def create_mob(name):
-        account = meta.Session.merge(session['account'])
+        account = get_current_account()
 
         mob = MudObj()
         mob.account = account
@@ -161,21 +184,21 @@ class Service(object):
         meta.Session.add(mob)
         meta.Session.commit()
 
-        session['mob'] = mob
-        session.save()
+        set_current_mob(mob)
+
         return mob
             
     @staticmethod
     def status():
-        return meta.Session.merge(session['mob'])
+        return get_current_mob()
 
     @staticmethod
-    def update(name=None, description=None):
-        mob = meta.Session.merge(session['mob'])
-        if name:
-            mob.name = name
-        if description:
-            mob.description = description
+    def update(id, **attrs):
+        mob = get_current_mob()
+        if not mob.god:
+            raise Exception("you are not god")
+        o = meta.Session.query(MudObj).get(id)
+        o.update(**attrs)
         meta.Session.commit()
         return True
 
@@ -183,7 +206,7 @@ class Service(object):
     def look():
         """Looks at the room the character is in. Note that the IDs are not
         the actual DB IDs."""
-        mob = meta.Session.merge(session['mob'])
+        mob = get_current_mob()
 
         room = mob.container
         return room.__json__(show=set(('contents', 'exits')))
@@ -195,7 +218,7 @@ class Service(object):
 
     @staticmethod
     def create(**attrs):
-        mob = meta.Session.merge(session['mob'])
+        mob = get_current_mob()
         if not mob.god:
             raise Exception("you are not a god")
         new_mob = MudObj(**attrs)
@@ -205,7 +228,7 @@ class Service(object):
 
     @staticmethod
     def go(exit_id):
-        mob = meta.Session.merge(session['mob'])
+        mob = get_current_mob()
         mob.go(UUID(exit_id))
         meta.Session.commit()
         return True
