@@ -299,29 +299,13 @@ function(Y) {
                 class:'action',
                 title: 'Link a new exit to an existing room',
                 on:{click: function(e) {
-                    // TODO: Collect direction and room id, and whether to link back.
-                    var popup = new LinkExitPopup();
+                    var popup = new NewExitPopup();
                     popup.render();
                     popup.show();
                     var xy = [e.pageX, e.pageY];
                     popup.set('xy', xy);
                     popup.constrain(xy, true);
                     popup.on('submit', function(p) {
-                        var link_room = function(dest_id) {
-                            var create_exit = call_svc('create', {
-                                name:p.name,
-                                source_id:current_room.id,
-                                dest_id:dest_id
-                            });
-                            create_exit.on('success', look.action);
-                            if (p.reverse && opposite_direction[p.name]) {
-                                call_svc('create', {
-                                    name: opposite_direction[p.name],
-                                    source_id:dest_id,
-                                    dest_id:current_room.id
-                                })
-                            }
-                        };
                         if (!p.dest_id) {
                             var create_room = call_svc('create', {
                                 name:'Empty Room',
@@ -333,6 +317,23 @@ function(Y) {
                         } else {
                             link_room(p.dest_id);
                         }
+
+                        var link_room = function(dest_id) {
+                            var create_exit = call_svc('create', {
+                                name:p.name,
+                                source_id:current_room.id,
+                                dest_id:dest_id
+                            });
+                            create_exit.on('success', look.action);
+                            if (p.reverse) {
+                                call_svc('create', {
+                                    name: p.reverse,
+                                    source_id:dest_id,
+                                    dest_id:current_room.id
+                                })
+                            }
+                        };
+
                         popup.destroy();
                     });
                     popup.on('cancel', function() {
@@ -352,11 +353,10 @@ function(Y) {
         var contents_div = Y.one('#room-contents');
         var no_contents = Y.one('#room-no-contents');
 
+        contents_div.empty();
         if (contents.length == 0) {
-            contents_div.hide();
             no_contents.show();
         } else {
-            contents_div.empty();
             Y.each(contents, function(item) {
                 contents_div.append(div(null, span({
                     class:'action',
@@ -367,7 +367,15 @@ function(Y) {
                 }, item.name || 'unnamed object')));
             });
             no_contents.hide();
-            contents_div.show();
+        }
+
+        if (current_mob.god) {
+            contents_div.append(hr());
+            contents_div.append(div(null, span({
+                class:'action',
+                title:'Create a new object in this room',
+                on:{click:function(e) {
+                }}}, "add object")));
         }
     };
 
@@ -560,12 +568,9 @@ function(Y) {
         }
     };
 
-    var OptionsPopup = Y.Base.create('options-popup', Y.Widget,
+    var Popup = Y.Base.create('popup', Y.Widget,
         [Y.WidgetPosition, Y.WidgetPositionConstrain], {
-            actions: [ look, go, examine, clone, edit ],
-
             initializer: function(config) {
-                this.after('mudobjChange', this.syncUI);
                 this.after('visibleChange', this._afterVisibleChange);
             },
 
@@ -585,12 +590,21 @@ function(Y) {
                 }
             },
 
-            renderUI: function() {
-                var self = this;
-            },
-
             bindUI: function() {
                 this._afterVisibleChange();
+            },
+
+        }, {
+        });
+
+
+    var OptionsPopup = Y.Base.create('options-popup', Popup,
+        [], {
+            actions: [ look, go, examine, clone, edit ],
+
+            initializer: function(config) {
+                Popup.prototype.initializer.call(this, config);
+                this.after('mudobjChange', this.syncUI);
             },
 
             syncUI: function() {
@@ -612,14 +626,13 @@ function(Y) {
             }
         });
 
-    var LinkExitPopup = Y.Base.create('link-exit-popup', Y.Widget,
-        [Y.WidgetPosition, Y.WidgetPositionConstrain, Y.EventTarget],
+    var NewExitPopup = Y.Base.create('link-exit-popup', Popup,
+        [Y.EventTarget],
         {
-            initializer: function() {
+            initializer: function(config) {
+                Popup.prototype.initializer.call(this, config);
                 this.publish('submit');
                 this.publish('cancel');
-                this.after('visibleChange', this._afterVisibleChange);
-                this._afterVisibleChange();
             },
             renderUI: function() {
                 var self = this;
@@ -634,13 +647,13 @@ function(Y) {
                 _tbody.append(tr(null, td({colspan:2}, h2(null, "Add an Exit"))));
 
                 this._name = input({type:'text'});
-                this._reverse = input({type:'checkbox', checked:'checked'});
+                this._reverse = input({type:'text'});
                 this._dest_id = input({type:'text'});
                 this._submit = button(null, 'submit');
                 this._submit.on('click', function() {
                     self.fire('submit', {
                         name:self._name.get('value'),
-                        reverse:self._reverse.get('checked'),
+                        reverse:self._reverse.get('value'),
                         dest_id:self._dest_id.get('value'),
                     });
                 });
@@ -664,25 +677,7 @@ function(Y) {
                 _tbody.append(tr(null,
                     th(null, ''),
                     td(null, this._submit, this._cancel)));
-            },
-
-            _afterVisibleChange: function() {
-                if (this.get('visible')) {
-                    var self = this;
-                    var cb = this.get('contentBox');
-                    this._outside_click = cb.get('ownerDocument').on('mousedown',
-                        function(e) {
-                            var t = e.target;
-                            if (!t.compareTo(cb) && !cb.contains(t)) {
-                                self.hide();
-                            }       
-                        });
-                } else {
-                    this._outside_click.detach();
-                }
-            },
-
-            
+            }
         }, {
         });
 });
