@@ -49,7 +49,13 @@ YUI().use('node', 'event', function(Y) {
         };
     };      
             
+    hr = _named_el('hr');
+    table = _named_el('table');
+    thead = _named_el('thead');
+    tbody = _named_el('tbody');
+    tfoot = _named_el('tfoot');
     tr = _named_el('tr');
+    th = _named_el('th');
     td = _named_el('td');
     span = _named_el('span');
     div = _named_el('div');
@@ -59,6 +65,13 @@ YUI().use('node', 'event', function(Y) {
     ol = _named_el('ol');
     ul = _named_el('ul');
     li = _named_el('li');
+
+    h1 = _named_el('h1');
+    h2 = _named_el('h2');
+    h3 = _named_el('h3');
+    h4 = _named_el('h4');
+    h5 = _named_el('h5');
+    h6 = _named_el('h6');
 
     button = _named_el('button');
     input = _named_el('input');

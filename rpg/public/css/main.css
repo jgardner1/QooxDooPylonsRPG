@@ -103,14 +103,17 @@ table.no-border th, .no-border td {
   border: none;
 }
 
-.yui3-options-popup-hidden {
+.yui3-options-popup-hidden,
+.yui3-link-exit-popup-hidden {
     display: none;
 }
 
-.yui3-options-popup {
+.yui3-options-popup,
+.yui3-link-exit-popup {
     position:absolute;
 }
-.yui3-options-popup-content {
+.yui3-options-popup-content,
+.yui3-link-exit-popup-content {
     background: white;
     border: 1px solid #444;
     border-radius: 1em;

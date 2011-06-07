@@ -16,14 +16,15 @@
         <div style="margin-right: 10px;"></div>
 
         <div id="room">
-          <h2 id="room-name"></h2>
+          <h2><span class="action" id="room-name"></span></h2>
+          <div id="room-id"></div>
           <div id="room-description"></div>
 
           <div class="yui3-g" style="margin-top: 1em;">
             <div class="yui3-u-1-2">
               <div style="margin-right: 10px;">
                 <h3>Exits</h3>
-                <ul id="room-exits"></ul>
+                <div id="room-exits"></div>
                 <div id="room-no-exits" style="display: none;">There are no exits from here that you can
                   see.</div>
               </div>
@@ -31,7 +32,7 @@
             <div class="yui3-u-1-2">
               <div style="margin-right: 10px;">
                 <h3>Contents</h3>
-                <ul id="room-contents"></ul>
+                <div id="room-contents"></div>
                 <div id="room-no-contents" style="display: none;">There are no
                   contents that you can see.</div>
               </div>
@@ -63,11 +64,7 @@
               </div>
               <div id="inventory">
               </div>
-              <div id="commands">
-                <ul>
-                  <li><a href="#" id="switch_character">Switch Character</a></li>
-                  <li><a href="#" id="logout">Logout</a></li>
-                </ul>
+              <div id="global-actions">
               </div>
             </div>
           </div>

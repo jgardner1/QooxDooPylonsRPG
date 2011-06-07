@@ -11,7 +11,7 @@ import json
 import urllib
 import traceback
 from datetime import time, datetime, date, timedelta
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 def json_default(o):
     __json__ = getattr(o, '__json__', None)
@@ -192,3 +192,22 @@ class Service(object):
     @staticmethod
     def do(cmd):
         raise NotImplementedError
+
+    @staticmethod
+    def create(**attrs):
+        mob = meta.Session.merge(session['mob'])
+        if not mob.god:
+            raise Exception("you are not a god")
+        new_mob = MudObj(**attrs)
+        meta.Session.add(new_mob)
+        meta.Session.commit()
+        return new_mob
+
+    @staticmethod
+    def go(exit_id):
+        mob = meta.Session.merge(session['mob'])
+        mob.go(UUID(exit_id))
+        meta.Session.commit()
+        return True
+        
+        

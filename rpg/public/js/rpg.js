@@ -1,5 +1,3 @@
-var switch_character,
-    logout;
 YUI().use(
     'anim', 'transition', 'oop', 'event-key', 'base', 'node', 'event',
     'event-custom', 'io', 'json',
@@ -52,7 +50,7 @@ function(Y) {
         return new ServiceRequest(method, args);
     };
 
-    var room, status, input, current_mob, current_account;
+    var room, status, current_mob, current_account, current_room;
     var init = function() {
         room = Y.one('#room');
         account = Y.one('#account');
@@ -63,8 +61,6 @@ function(Y) {
         Y.one('#login-button').on('click', login_clicked);
         Y.one('#forgot-button').on('click', forgot_clicked);
         Y.one('#create-button').on('click', create_clicked);
-        Y.one('#switch_character').on('click', switch_character);
-        Y.one('#logout').on('click', logout);
         Y.one('#mob-name').on('change', mob_name_change);
         Y.one('#mob-description').on('change', mob_description_change);
 
@@ -186,26 +182,18 @@ function(Y) {
         });
     };
 
-    var switch_character = function() {
-        current_mob = null;
-        call_svc('logout_mob');
-        show_account();
-    };
-
-    var logout = function() {
-        current_mob = null;
-        current_account = null;
-        call_svc('logout');
-        show_login();
-    };
-
     var mob_name_change = function() {
-        call_svc('update', {name:Y.one('#mob-name').get('value')});
+        call_svc('edit', {
+            id:current_mob.id,
+            name:Y.one('#mob-name').get('value')});
     };
 
     var mob_description_change = function() {
-        call_svc('update', {description:Y.one('#mob-description').get('value')});
+        call_svc('edit', {
+            id: current_mob.id,
+            description:Y.one('#mob-description').get('value')});
     };
+
     var show_login = function() {
         Y.one('#login-popup').show();
 
@@ -247,28 +235,49 @@ function(Y) {
         Y.one('#mob-name').set('value', current_mob.name);
         Y.one('#mob-description').set('value', current_mob.description);
 
-        var call = call_svc('look');
-        call.on('success', show_room);
+        Y.one('#room-name').on('click', function(e) {
+            show_options(current_room, [e.pageX, e.pageY], true);
+        });
+
+        var a = Y.one('#global-actions');
+        a.empty();
+        add_action(a, switch_character, [], null);
+        add_action(a, logout, [], null);
+
+        look.action();
     };
 
-    var show_room = function(room) {
-        Y.one('#room-name').setContent(room.name);
-        Y.one('#room-description').setContent(room.description);
+    var show_room = function() {
+        Y.one('#room-name').setContent(current_room.name);
+        if (current_mob.god) {
+            Y.one('#room-id').show().setContent(current_room.id);
+        } else {
+            Y.one('#room-id').hide();
+        }
+        Y.one('#room-description').setContent(current_room.description);
 
-        show_exits(room.exits);
-        show_contents(room.contents);
+        show_exits(current_room.exits);
+        show_contents(current_room.contents);
     };
 
     var show_exits = function(exits) {
         var exits_div = Y.one('#room-exits');
         var no_exits = Y.one('#room-no-exits');
+        var dirs = {
+            'north':false,
+            'south':false,
+            'east':false,
+            'west':false,
+            'up':false,
+            'down':false,
+        };
 
+        exits_div.empty();
         if (exits.length == 0) {
-            exits_div.hide();
             no_exits.show();
         } else {
-            exits_div.empty();
             Y.each(exits, function(exit) {
+                dirs[exit.name] = true;
                 exits_div.append(div(null, span({
                     class:'action',
                     title:exit.description || '',
@@ -278,7 +287,64 @@ function(Y) {
                 }, exit.name || 'unnamed exit')));
             });
             no_exits.hide();
-            exits_div.show();
+        }
+        if (current_mob.god) {
+            exits_div.append('<hr/>');
+            Y.each(['north', 'south', 'east', 'west', 'up', 'down'], function(dir) {
+                if (!dirs[dir]) {
+                    add_action(exits_div, dig, [dir], null);
+                }
+            });
+            exits_div.append(div(null, span({
+                class:'action',
+                title: 'Link a new exit to an existing room',
+                on:{click: function(e) {
+                    // TODO: Collect direction and room id, and whether to link back.
+                    var popup = new LinkExitPopup();
+                    popup.render();
+                    popup.show();
+                    var xy = [e.pageX, e.pageY];
+                    popup.set('xy', xy);
+                    popup.constrain(xy, true);
+                    popup.on('submit', function(p) {
+                        var link_room = function(dest_id) {
+                            var create_exit = call_svc('create', {
+                                name:p.name,
+                                source_id:current_room.id,
+                                dest_id:dest_id
+                            });
+                            create_exit.on('success', look.action);
+                            if (p.reverse && opposite_direction[p.name]) {
+                                call_svc('create', {
+                                    name: opposite_direction[p.name],
+                                    source_id:dest_id,
+                                    dest_id:current_room.id
+                                })
+                            }
+                        };
+                        if (!p.dest_id) {
+                            var create_room = call_svc('create', {
+                                name:'Empty Room',
+                                description:"This is a brand new, empty room."
+                            });
+                            create_room.on('success', function(room) {
+                                link_room(room.id);
+                            });
+                        } else {
+                            link_room(p.dest_id);
+                        }
+                        popup.destroy();
+                    });
+                    popup.on('cancel', function() {
+                        popup.destroy();
+                    });
+                    popup.after('visibleChange', function() {
+                        if (!popup.get('visible')) {
+                            popup.destroy();
+                        }
+                    });
+                }}},
+                'new exit')));
         }
     };
 
@@ -341,6 +407,70 @@ function(Y) {
         };
     };
 
+    var switch_character = action(
+        'switch character',
+        function() {
+            return 'Logout as '+current_mob.name+' and login as someone else';
+        },
+        repeat_true,
+        function() {
+            current_mob = null;
+            call_svc('logout_mob');
+            show_account();
+        });
+
+    var logout = action(
+        'logout',
+        function () {
+            return 'Logout from your account';
+        },
+        repeat_true,
+        function() {
+            current_mob = null;
+            current_account = null;
+            call_svc('logout');
+            show_login();
+        });
+
+    var opposite_directions = {
+        'north':'south',
+        'south':'north',
+        'east':'west',
+        'west':'east',
+        'up':'down',
+        'down':'up',
+    };
+    var dig = action(
+        function(dir) {
+            return "dig "+dir;
+        },
+        function(dir) {
+            return "dig "+dir;
+        },
+        repeat_true,
+        function(dir) {
+            // Create a new room
+            var create_room = call_svc('create', {
+                name: 'Empty Room',
+                description: 'This is a brand new, empty room.'
+            });
+            create_room.on('success', function(room) {
+                var create_exit = call_svc('create', {
+                    name:dir,
+                    source_id:current_room.id,
+                    dest_id:room.id
+                });
+                create_exit.on('success', look.action);
+
+                call_svc('create', {
+                    name:opposite_directions[dir],
+                    source_id: room.id,
+                    dest_id: current_room.id
+                });
+            });
+        });
+
+
     var go = action(
         'go',
         function(o) {
@@ -348,7 +478,24 @@ function(Y) {
         },
         is_exit,
         function(o) {
-            alert('go');
+            var call = call_svc('go', {exit_id:o.id});
+            call.on('success', look.action);
+        });
+
+    var look = action(
+        'look',
+        function(o) {
+            return 'Look at the room more closely.';
+        },
+        function(o) {
+            return o.id == current_room.id;
+        },
+        function(o) {
+            var call = call_svc('look');
+            call.on('success', function(room) {
+                current_room = room;
+                show_room();
+            });
         });
 
     var examine = action(
@@ -356,9 +503,11 @@ function(Y) {
         function(o) {
             return "Examine "+o.name+" more closely";
         },
-        repeat_true,
         function(o) {
-            alert('examine');
+            return o.id != current_room.id;
+        },
+        function(o) {
+            alert("examine");
         });
 
     var clone = action(
@@ -366,19 +515,11 @@ function(Y) {
         function(o) {
             return "Create a clone of "+o.name;
         },
-        is_admin,
+        function(o){
+            return is_admin() && o.id != current_room.id;
+        },
         function(o) {
             alert('clone');
-        });
-
-    var destroy = action(
-        'destroy',
-        function(o) {
-            return "Destroy this";
-        },
-        is_admin,
-        function(o) {
-            alert('destroy');
         });
 
     var edit = action(
@@ -391,9 +532,37 @@ function(Y) {
             alert('edit');
         });
 
+    var add_action = function(el, action, args, on_exec) {
+        var test = action.test || false;
+        if (test.apply) {
+            test = test.apply(null, args);
+        }
+
+        if (test) {
+            var name = action.name || '';
+            if (action.name.apply) {
+                 name = action.name.apply(null, args);
+            }
+
+            var description = action.description || '';
+            if (description.apply) {
+                description = description.apply(null, args);
+            }
+
+            el.append(div({class:'option'},
+                span({
+                    title:description,
+                    class:'action',
+                    on:{click:function() {
+                        action.action.apply(null, args);
+                        on_exec && on_exec();
+                    }}}, name)));
+        }
+    };
+
     var OptionsPopup = Y.Base.create('options-popup', Y.Widget,
         [Y.WidgetPosition, Y.WidgetPositionConstrain], {
-            actions: [ go, examine, clone, destroy, edit ],
+            actions: [ look, go, examine, clone, edit ],
 
             initializer: function(config) {
                 this.after('mudobjChange', this.syncUI);
@@ -416,10 +585,6 @@ function(Y) {
                 }
             },
 
-            destructor: function() {
-                this._outside_click.detach();
-            },
-
             renderUI: function() {
                 var self = this;
             },
@@ -435,16 +600,9 @@ function(Y) {
                 cb.empty();
                 if (o) {
                     Y.each(this.actions, function(action) {
-                        if (action.test(o)) {
-                            cb.append(div({class:'option'},
-                                span({
-                                    title:action.description(o),
-                                    class:'action',
-                                    on:{click:function() {
-                                        action.action(o);
-                                        self.hide();
-                                    }}}, action.name)));
-                        }
+                        add_action(cb, action, [o], function() {
+                            self.hide();
+                        });
                     });
                 }
             }
@@ -452,5 +610,79 @@ function(Y) {
             ATTRS: {
                 mudobj: {}
             }
+        });
+
+    var LinkExitPopup = Y.Base.create('link-exit-popup', Y.Widget,
+        [Y.WidgetPosition, Y.WidgetPositionConstrain, Y.EventTarget],
+        {
+            initializer: function() {
+                this.publish('submit');
+                this.publish('cancel');
+                this.after('visibleChange', this._afterVisibleChange);
+                this._afterVisibleChange();
+            },
+            renderUI: function() {
+                var self = this;
+                var cb = this.get('contentBox');
+
+                var _table = table({class:'no-border vertical'});
+                cb.append(_table);
+
+                var _tbody = tbody();
+                _table.append(_tbody);
+
+                _tbody.append(tr(null, td({colspan:2}, h2(null, "Add an Exit"))));
+
+                this._name = input({type:'text'});
+                this._reverse = input({type:'checkbox', checked:'checked'});
+                this._dest_id = input({type:'text'});
+                this._submit = button(null, 'submit');
+                this._submit.on('click', function() {
+                    self.fire('submit', {
+                        name:self._name.get('value'),
+                        reverse:self._reverse.get('checked'),
+                        dest_id:self._dest_id.get('value'),
+                    });
+                });
+                this._cancel = button(null, 'cancel');
+                this._cancel.on('click', function() {
+                    self.fire('cancel');
+                });
+
+                _tbody.append(tr(null,
+                    th(null, 'Name:'),
+                    td(null, this._name)));
+
+                _tbody.append(tr(null,
+                    th(null, 'Reverse:'),
+                    td(null, this._reverse)));
+
+                _tbody.append(tr(null,
+                    th(null, 'Room ID:'),
+                    td(null, this._dest_id)));
+
+                _tbody.append(tr(null,
+                    th(null, ''),
+                    td(null, this._submit, this._cancel)));
+            },
+
+            _afterVisibleChange: function() {
+                if (this.get('visible')) {
+                    var self = this;
+                    var cb = this.get('contentBox');
+                    this._outside_click = cb.get('ownerDocument').on('mousedown',
+                        function(e) {
+                            var t = e.target;
+                            if (!t.compareTo(cb) && !cb.contains(t)) {
+                                self.hide();
+                            }       
+                        });
+                } else {
+                    this._outside_click.detach();
+                }
+            },
+
+            
+        }, {
         });
 });

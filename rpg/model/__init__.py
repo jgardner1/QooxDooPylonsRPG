@@ -132,6 +132,36 @@ class MudObj(Base):
                 d[attr] = val
         return d
 
+    def __init__(self, **attrs):
+        Base.__init__(self)
+        self.update(**attrs)
+
+    def update(self, **attrs):
+        for attr, val in attrs.items():
+            if attr not in self._attrs:
+                raise ValueError("unexpected attr %r" % (attr,))
+            setattr(self, attr, val)
+
+    def clone(self):
+        new_obj = MudObj()
+        for attr in self._attrs:
+            setattr(new_obj, attr, getattr(self. attr))
+        return new_obj
+
+    def go(self, exit_id):
+        room = self.container
+        for exit in room.exits:
+            if exit.id == exit_id:
+                self.container_id = exit.dest_id
+                return
+        raise ValueError("no such exit %s" % (exit_id,))
+
+    def __getstate__(self):
+        return dict(
+            id=self.id,
+            _sa_instance_state=self._sa_instance_state)
+
+
 MudObj.container = relationship(MudObj,
     primaryjoin=MudObj.id==MudObj.container_id,
     remote_side=MudObj.id);
