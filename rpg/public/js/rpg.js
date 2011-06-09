@@ -215,8 +215,8 @@ function(Y) {
         var mobs_div = Y.one('#account-mobs');
         mobs_div.empty();
         Y.each(current_account.mobs, function(mob) {
-            var div = mobs_div.append('<div>'+mob.name+'</div>');
-            div.on('click', function() {
+            var DIV = mobs_div.append('<DIV>'+mob.name+'</DIV>');
+            DIV.on('click', function() {
                 call_svc('choose_mob', {mob_id:mob.id});
                 current_mob = mob;
                 show_main();
@@ -278,7 +278,7 @@ function(Y) {
         } else {
             Y.each(exits, function(exit) {
                 dirs[exit.name] = true;
-                exits_div.append(div(null, span({
+                exits_div.append(DIV(null, SPAN({
                     class:'action',
                     title:exit.description || '',
                     on:{click:function(e){
@@ -289,54 +289,27 @@ function(Y) {
             no_exits.hide();
         }
         if (current_mob.god) {
-            exits_div.append('<hr/>');
+            exits_div.append('<HR/>');
             Y.each(['north', 'south', 'east', 'west', 'up', 'down'], function(dir) {
                 if (!dirs[dir]) {
                     add_action(exits_div, dig, [dir], null);
                 }
             });
-            exits_div.append(div(null, span({
+            exits_div.append(DIV(null, SPAN({
                 class:'action',
                 title: 'Link a new exit to an existing room',
                 on:{click: function(e) {
-                    var popup = new NewExitPopup();
+                    var popup = new CreateExitPopup();
                     popup.render();
                     popup.show();
                     var xy = [e.pageX, e.pageY];
                     popup.set('xy', xy);
                     popup.constrain(xy, true);
-                    popup.on('submit', function(p) {
-                        if (!p.dest_id) {
-                            var create_room = call_svc('create', {
-                                name:'Empty Room',
-                                description:"This is a brand new, empty room."
-                            });
-                            create_room.on('success', function(room) {
-                                link_room(room.id);
-                            });
-                        } else {
-                            link_room(p.dest_id);
-                        }
-
-                        var link_room = function(dest_id) {
-                            var create_exit = call_svc('create', {
-                                name:p.name,
-                                source_id:current_room.id,
-                                dest_id:dest_id
-                            });
-                            create_exit.on('success', look.action);
-                            if (p.reverse) {
-                                call_svc('create', {
-                                    name: p.reverse,
-                                    source_id:dest_id,
-                                    dest_id:current_room.id
-                                })
-                            }
-                        };
-
+                    popup.on('submit', create_exit);
+                    popup.after('submit', function() {
                         popup.destroy();
                     });
-                    popup.on('cancel', function() {
+                    popup.after('cancel', function() {
                         popup.destroy();
                     });
                     popup.after('visibleChange', function() {
@@ -345,7 +318,7 @@ function(Y) {
                         }
                     });
                 }}},
-                'new exit')));
+                'create exit')));
         }
     };
 
@@ -358,7 +331,7 @@ function(Y) {
             no_contents.show();
         } else {
             Y.each(contents, function(item) {
-                contents_div.append(div(null, span({
+                contents_div.append(DIV(null, SPAN({
                     class:'action',
                     title:item.description || '',
                     on:{click:function(e) {
@@ -370,11 +343,34 @@ function(Y) {
         }
 
         if (current_mob.god) {
-            contents_div.append(hr());
-            contents_div.append(div(null, span({
+            contents_div.append(HR());
+            contents_div.append(DIV(null, SPAN({
                 class:'action',
                 title:'Create a new object in this room',
-                on:{click:function(e) {
+                on:{click:function(event) {
+                    var popup = new EditPopup({});
+                    popup.render();
+                    popup.show();
+                    var xy = [event.pageX, event.pageY];
+                    popup.set('xy', xy);
+                    popup.constrain(xy, true);
+                    popup.on('submit', function(p) {
+                        p = p.details[0];
+                        p.container_id = current_mob.container_id;
+                        var call = call_svc('create', p);
+                        call.on('success', look.action);
+                    });
+                    popup.after('submit', function() {
+                        popup.destroy();
+                    });
+                    popup.after('cancel', function() {
+                        popup.destroy();
+                    });
+                    popup.after('visibleChange', function() {
+                        if (!popup.get('visible')) {
+                            popup.destroy();
+                        }
+                    });
                 }}}, "add object")));
         }
     };
@@ -478,6 +474,36 @@ function(Y) {
             });
         });
 
+    var create_exit = function(p) {
+        if (!p.dest_id) {
+            var create_room = call_svc('create', {
+                name:'Empty Room',
+                description:"This is a brand new, empty room."
+            });
+            create_room.on('success', function(room) {
+                link_room(room.id);
+            });
+        } else {
+            link_room(p.dest_id);
+        }
+
+        var link_room = function(dest_id) {
+            var create_exit = call_svc('create', {
+                name:p.name,
+                source_id:current_room.id,
+                dest_id:dest_id
+            });
+            create_exit.on('success', look.action);
+            if (p.reverse) {
+                call_svc('create', {
+                    name: p.reverse,
+                    source_id:dest_id,
+                    dest_id:current_room.id
+                })
+            }
+        };
+    };
+
 
     var go = action(
         'go',
@@ -527,7 +553,8 @@ function(Y) {
             return is_admin() && o.id != current_room.id;
         },
         function(o) {
-            alert('clone');
+            var call = call_svc('clone', {id:o.id});
+            call.on('success', look.action);
         });
 
     var edit = action(
@@ -537,8 +564,29 @@ function(Y) {
         },
         is_admin,
         function(o) {
-            alert('edit');
+            var popup = new EditPopup({mudobj:o});
+            popup.render();
+            popup.show();
+            var xy = [event.pageX, event.pageY];
+            popup.set('xy', xy);
+            popup.constrain(xy, true);
+            popup.on('submit', edit_submit);
+            popup.after('submit', function() {
+                popup.destroy();
+            });
+            popup.after('cancel', function() {
+                popup.destroy();
+            });
+            popup.after('visibleChange', function() {
+                if (!popup.get('visible')) {
+                    popup.destroy();
+                }
+            });
         });
+    var edit_submit = function(p) {
+        var call = call_svc('update', p.details[0]);
+        call.on('success', look.action);
+    };
 
     var add_action = function(el, action, args, on_exec) {
         var test = action.test || false;
@@ -557,11 +605,12 @@ function(Y) {
                 description = description.apply(null, args);
             }
 
-            el.append(div({class:'option'},
-                span({
+            el.append(DIV({class:'option'},
+                SPAN({
                     title:description,
                     class:'action',
-                    on:{click:function() {
+                    on:{click:function(e) {
+                        event = e;
                         action.action.apply(null, args);
                         on_exec && on_exec();
                     }}}, name)));
@@ -576,6 +625,7 @@ function(Y) {
 
             _afterVisibleChange: function() {
                 if (this.get('visible')) {
+                    this.get('boundingBox').removeClass('yui3-popup-hidden');
                     var self = this;
                     var cb = this.get('contentBox');
                     this._outside_click = cb.get('ownerDocument').on('mousedown',
@@ -587,11 +637,17 @@ function(Y) {
                         });
                 } else {
                     this._outside_click.detach();
+                    this.get('boundingBox').addClass('yui3-popup-hidden');
                 }
             },
 
             bindUI: function() {
                 this._afterVisibleChange();
+            },
+
+            renderUI: function() {
+                this.get('boundingBox').addClass('yui3-popup');
+                this.get('contentBox').addClass('yui3-popup-content');
             },
 
         }, {
@@ -626,7 +682,7 @@ function(Y) {
             }
         });
 
-    var NewExitPopup = Y.Base.create('link-exit-popup', Popup,
+    var FormPopup = Y.Base.create('form-popup', Popup,
         [Y.EventTarget],
         {
             initializer: function(config) {
@@ -635,49 +691,171 @@ function(Y) {
                 this.publish('cancel');
             },
             renderUI: function() {
+                Popup.prototype.renderUI.call(this);
                 var self = this;
                 var cb = this.get('contentBox');
 
-                var _table = table({class:'no-border vertical'});
-                cb.append(_table);
-
-                var _tbody = tbody();
-                _table.append(_tbody);
-
-                _tbody.append(tr(null, td({colspan:2}, h2(null, "Add an Exit"))));
-
-                this._name = input({type:'text'});
-                this._reverse = input({type:'text'});
-                this._dest_id = input({type:'text'});
-                this._submit = button(null, 'submit');
+                this._submit = BUTTON(null, 'submit');
                 this._submit.on('click', function() {
-                    self.fire('submit', {
-                        name:self._name.get('value'),
-                        reverse:self._reverse.get('value'),
-                        dest_id:self._dest_id.get('value'),
-                    });
+                    self.fire('submit', self.get_values());
                 });
-                this._cancel = button(null, 'cancel');
+                this._cancel = BUTTON(null, 'cancel');
                 this._cancel.on('click', function() {
                     self.fire('cancel');
                 });
-
-                _tbody.append(tr(null,
-                    th(null, 'Name:'),
-                    td(null, this._name)));
-
-                _tbody.append(tr(null,
-                    th(null, 'Reverse:'),
-                    td(null, this._reverse)));
-
-                _tbody.append(tr(null,
-                    th(null, 'Room ID:'),
-                    td(null, this._dest_id)));
-
-                _tbody.append(tr(null,
-                    th(null, ''),
-                    td(null, this._submit, this._cancel)));
             }
         }, {
+        });
+
+    var CreateExitPopup = Y.Base.create('link-exit-popup', FormPopup,
+        [],
+        {
+            renderUI: function() {
+                Popup.prototype.renderUI.call(this);
+                FormPopup.prototype.renderUI.call(this);
+                var self = this;
+                var cb = this.get('contentBox');
+
+                var _table = TABLE({
+                    class:'no-border vertical',
+                    style:'margin:0;'});
+                cb.append(_table);
+
+                var _tbody = TBODY();
+                _table.append(_tbody);
+
+                _tbody.append(TR(null, TD({colspan:2}, H2(null, "Add an Exit"))));
+
+                this._name = INPUT({type:'text'});
+                this._reverse = INPUT({type:'text'});
+                this._dest_id = INPUT({type:'text'});
+
+                _tbody.append(TR(null,
+                    TH(null, 'Name:'),
+                    TD(null, this._name)));
+
+                _tbody.append(TR(null,
+                    TH(null, 'Reverse:'),
+                    TD(null, this._reverse)));
+
+                _tbody.append(TR(null,
+                    TH(null, 'Room ID:'),
+                    TD(null, this._dest_id)));
+
+                _tbody.append(TR(null,
+                    TH(null, ''),
+                    TD(null, this._submit, this._cancel)));
+            },
+
+            get_values: function() {
+                return {
+                    name:self._name.get('value'),
+                    reverse:self._reverse.get('value'),
+                    dest_id:self._dest_id.get('value')
+                };
+            }
+        }, {
+        });
+
+    var EditPopup = Y.Base.create('edit-popup', FormPopup,
+        [],
+        {
+            initializer: function(config) {
+                FormPopup.prototype.initializer.call(this, config);
+                this.after('mudobjChange', this.syncUI);
+            },
+
+            renderUI: function() {
+                FormPopup.prototype.renderUI.call(this);
+                var self = this;
+                var cb = this.get('contentBox');
+
+                var _table = TABLE({
+                    class:'no-border vertical',
+                    style:'margin:0;'});
+                cb.append(_table);
+
+                var _tbody = TBODY();
+                _table.append(_tbody);
+
+                this._id = SPAN();
+                this._name = INPUT({type:'text'});
+                this._description = TEXTAREA();
+                this._container_id = INPUT({type:'text'});
+                this._source_id = INPUT({type:'text'});
+                this._dest_id = INPUT({type:'text'});
+                this._god = INPUT({type:'checkbox'});
+                this._ai = INPUT({type:'text'});
+                this._size = INPUT({type:'text'});
+                this._interior_size = INPUT({type:'text'});
+                this._x = INPUT({type:'text'});
+                this._y = INPUT({type:'text'});
+
+                var ROW = function(name, content) {
+                    return TR(null,
+                        TH(null, name),
+                        TD(null, content));
+                }
+
+                this._id_tr = _tbody.appendChild(ROW('ID:', this._id))
+                _tbody.append(ROW('Name:', this._name));
+                _tbody.append(ROW('Desc:', this._description));
+                _tbody.append(ROW('Container:', this._container_id));
+                _tbody.append(ROW('Exit Source:', this._source_id));
+                _tbody.append(ROW('Exit Dest:', this._dest_id));
+                _tbody.append(ROW('God?', this._god));
+                _tbody.append(ROW('AI:', this._ai));
+                _tbody.append(ROW('Size:', this._size));
+                _tbody.append(ROW('Int. Size:', this._interior_size));
+                _tbody.append(ROW('X:', this._x));
+                _tbody.append(ROW('Y:', this._y));
+                _tbody.append(ROW('', [this._submit, this._cancel]));
+            },
+
+            get_values: function() {
+                var result = {};
+                var o = this.get('mudobj');
+                if (o) {
+                    result.id = o.id;
+                }
+                result.name = this._name.get('value');
+                result.description = this._description.get('value');
+                result.container_id = this._container_id.get('value');
+                result.source_id = this._source_id.get('value');
+                result.dest_id = this._dest_id.get('value');
+                result.god = this._god.get('checked');
+                result.ai = this._ai.get('value');
+                result.size = this._size.get('value');
+                result.interior_size = this._interior_size.get('value');
+                result.x = this._x.get('value');
+                result.y = this._y.get('value');
+                return result;
+            },
+
+            syncUI: function() {
+                var self = this;
+                var o = this.get('mudobj')
+                if (o) {
+                    this._id_tr.show();
+                    this._id.setContent(o.id);
+                    this._name.set('value', o.name || '');
+                    this._description.set('value', o.description || '');
+                    this._container_id.set('value', o.container_id || '');
+                    this._source_id.set('value', o.source_id || '');
+                    this._dest_id.set('value', o.dest_id || '');
+                    this._god.set('checked', o.god);
+                    this._ai.set('value', o.ai || '');
+                    this._size.set('value', o.size || '');
+                    this._interior_size.set('value', o.interior_size || '');
+                    this._x.set('value', o.x || '');
+                    this._y.set('value', o.y || '');
+                } else {
+                    this._id_tr.hide();
+                }
+            }
+        }, {
+            ATTRS: {
+                mudobj: {}
+            }
         });
 });
