@@ -1,0 +1,3 @@
+[submodule "rpg/public/js/yui3-el"]
+	path = rpg/public/js/yui3-el
+	url = git@github.com:jgardner1/yui3-el.git
