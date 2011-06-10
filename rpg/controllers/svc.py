@@ -237,6 +237,17 @@ class Service(object):
         return new_mob
 
     @staticmethod
+    def clone(id):
+        mob = rpg_session.mob
+        if not mob.god:
+            raise Exception("you are not a god")
+        new_mob = meta.Session.query(MudObj).get(id).clone()
+        meta.Session.add(new_mob)
+        meta.Session.commit()
+        return new_mob
+
+
+    @staticmethod
     def go(exit_id):
         mob = rpg_session.mob
         mob.go(UUID(exit_id))

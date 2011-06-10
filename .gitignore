@@ -3,3 +3,9 @@ test.fs*
 *.db
 rpg.egg-info
 .~lock*
+env
+bin
+lib
+lib64
+*.egg
+include

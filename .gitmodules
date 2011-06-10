@@ -1,3 +1,9 @@
 [submodule "rpg/public/js/yui3-el"]
 	path = rpg/public/js/yui3-el
 	url = git@github.com:jgardner1/yui3-el.git
+[submodule "rpg/public/js/fn"]
+	path = rpg/public/js/fn
+	url = git@github.com:jgardner1/javascript-FN.git
+[submodule "rpg/public/js/qtjs"]
+	path = rpg/public/js/qtjs
+	url = git@github.com:jgardner1/qtjs.git

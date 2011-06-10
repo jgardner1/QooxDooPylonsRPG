@@ -23,7 +23,7 @@ from sqlalchemy.orm.collections import mapped_collection
 
 from os import urandom
 from hashlib import sha256
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 def gen_password_sha256(salt, password):
     """Returns the password_sha256 given salt and password"""
@@ -78,7 +78,6 @@ class MudObj(Base):
     container_id = Column(GUID, ForeignKey('mudobjs.id'))
 
     # Exits
-    direction = Column(Unicode)
     source_id = Column(GUID, ForeignKey('mudobjs.id'))
     dest_id = Column(GUID, ForeignKey('mudobjs.id'))
 
@@ -101,7 +100,6 @@ class MudObj(Base):
         'container_id',
         'container',
         'contents',
-        'direction',
         'source_id',
         'source',
         'dest_id',
@@ -140,12 +138,29 @@ class MudObj(Base):
         for attr, val in attrs.items():
             if attr not in self._attrs:
                 raise ValueError("unexpected attr %r" % (attr,))
+            if attr in ('id', 'container_id', 'source_id', 'dest_id'):
+                if not val:
+                    val = None
+                else:
+                    val = UUID(val)
+
+            elif attr in ('x', 'y', 'size', 'interior_size'):
+                if val == '':
+                    val = None
+                elif val is not None:
+                    val = float(val)
+
+            elif attr in ('god'):
+                val = bool(val)
+
             setattr(self, attr, val)
 
     def clone(self):
         new_obj = MudObj()
         for attr in self._attrs:
-            setattr(new_obj, attr, getattr(self. attr))
+            if attr in ('id'):
+                continue
+            setattr(new_obj, attr, getattr(self, attr))
         return new_obj
 
     def go(self, exit_id):
