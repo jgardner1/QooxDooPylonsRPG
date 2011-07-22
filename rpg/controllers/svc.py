@@ -41,16 +41,23 @@ class JSONFormatter(object):
 
     @staticmethod
     def response(response):
-        return json.dumps(dict(response=response),
-            default=json_default)
+        return json.dumps(response, default=json_default)
+
+    @staticmethod
+    def start_exception_response(start_response):
+        start_response('500 Internal Service Error',
+            [('Content-type', 'application/json'),
+             ('Cache-Control', 'no-cache'),
+             ('Pragma', 'no-cache'),
+             ('Expires', '-1')])
 
     @staticmethod
     def exception(exception):
-        return json.dumps(dict(exception=dict(
+        return json.dumps(dict(
                 name=exception.__class__.__name__,
                 message=exception.args[0],
                 args=exception.args,
-                traceback=traceback.format_exc(exception))),
+                traceback=traceback.format_exc(exception)),
             default=json_default)
         
 
@@ -80,15 +87,15 @@ class SvcController(BaseController):
             args = dict()
 
         try:
-            response = func(**args)
+            response = formatter.response(func(**args))
             formatter.start_response(start_response)
-            return formatter.response(response)
+            return response
         except Exception as exception:
-            formatter.start_response(start_response)
+            formatter.start_exception_response(start_response)
             return formatter.exception(exception)
 
 
-from rpg.model import meta, Account, MudObj, Universe
+from rpg.model import meta, Account, Mob, Universe
 
 class RPGSession(object):
     @property
@@ -113,7 +120,7 @@ class RPGSession(object):
     @property
     def mob(self):
         try:
-            return meta.Session.query(MudObj).get(session['mob_id'])
+            return meta.Session.query(Mob).get(session['mob_id'])
         except KeyError:
             raise AttributeError("mob is not set")
 
@@ -142,23 +149,26 @@ class Service(object):
 
         rpg_session.account = account
 
-        return account
+        return dict(account=account)
 
     @staticmethod
     def login(email, password):
         account = Account.find_account(email, password)
         rpg_session.account = account
 
-        return account
+        return dict(account=account)
 
     @staticmethod
     def logout():
         del rpg_session.account
-        return True
+        return dict(account=None)
 
     @staticmethod
     def get_mob_account():
-        result = dict()
+        result = dict(
+            account=None,
+            mob=None,
+        )
 
         try:
             result['account'] = rpg_session.account
@@ -169,87 +179,119 @@ class Service(object):
         return result
 
     @staticmethod
-    def choose_mob(mob_id):
+    def choose_mob(id):
         account = rpg_session.account
-        mob = account.mobs[mob_id]
+        mob = account.get_mob(id)
         rpg_session.mob = mob
-        return mob
+        return dict(mob=mob)
 
     @staticmethod
     def logout_mob():
         del rpg_session.mob
-        return True
+        return dict(mob=None)
 
     @staticmethod
     def create_mob(name):
-        account = get_current_account()
+        account = rpg_session.account
 
-        mob = MudObj()
+        mob = Mob()
         mob.account = account
         mob.name = name
+        mob.description = "A completely featureless human."
         mob.container = meta.Session.query(Universe).get('main').starting_world
-        mob.size = 2.0
+        mob.size = 0.85
+        mob.mass = 75.0
         mob.x = 0.0
         mob.y = 0.0
+        mob.ai = 'pc'
+        mob.ai_state = "{}"
         meta.Session.add(mob)
         meta.Session.commit()
 
         rpg_session.mob = mob
 
-        return mob
+        return dict(mob=mob)
             
     @staticmethod
     def status():
-        return rpg_session.mob
+        return dict(mob=rpg_session.mob)
 
     @staticmethod
     def update(id, **attrs):
         mob = rpg_session.mob
         if not mob.god:
             raise Exception("you are not god")
-        o = meta.Session.query(MudObj).get(id)
+        o = meta.Session.query(Mob).get(id)
         o.update(**attrs)
         meta.Session.commit()
-        return True
-
-    @staticmethod
-    def look():
-        """Looks at the room the character is in. Note that the IDs are not
-        the actual DB IDs."""
-        mob = rpg_session.mob
-
-        room = mob.container
-        return room.__json__(show=set(('contents', 'exits')))
-
-
-    @staticmethod
-    def do(cmd):
-        raise NotImplementedError
+        return dict(mob=o)
 
     @staticmethod
     def create(**attrs):
+        """Creates a new mob, returning it."""
         mob = rpg_session.mob
         if not mob.god:
             raise Exception("you are not a god")
-        new_mob = MudObj(**attrs)
+        new_mob = Mob(**attrs)
         meta.Session.add(new_mob)
         meta.Session.commit()
         return new_mob
+
+    @staticmethod
+    def createRoom(**attrs):
+        """Creates a new room, teleports the creator to it, and then returns
+        the new room and yourself."""
+        mob = rpg_session.mob
+        if not mob.god:
+            raise Exception("you are not a god")
+
+        new_mob = Mob(**attrs)
+        meta.Session.add(new_mob)
+
+        mob.container = new_mob
+        meta.Session.commit()
+
+        return dict(
+            mob=mob,
+            room=mob.look())
 
     @staticmethod
     def clone(id):
         mob = rpg_session.mob
         if not mob.god:
             raise Exception("you are not a god")
-        new_mob = meta.Session.query(MudObj).get(id).clone()
+        new_mob = meta.Session.query(Mob).get(id).clone()
         meta.Session.add(new_mob)
         meta.Session.commit()
         return new_mob
 
+    @staticmethod
+    def look():
+        """Looks at the room the character is in. Note that the IDs are not
+        the actual DB IDs."""
+        mob = rpg_session.mob
+        return dict(room=mob.look())
+
+    @staticmethod
+    def inventory():
+        """Looks at the room the character is in. Note that the IDs are not
+        the actual DB IDs."""
+        mob = rpg_session.mob
+        return mob.inventory()
 
     @staticmethod
     def go(exit_id):
         mob = rpg_session.mob
         mob.go(UUID(exit_id))
         meta.Session.commit()
-        return True
+        return dict(room=mob.look())
+
+    @staticmethod
+    def examine(id):
+        mob = rpg_session.mob
+        return mob.examine(UUID(id))
+
+    @staticmethod
+    def pickup(id):
+        return rpg_session.mob.pickup(id)
+

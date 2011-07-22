@@ -7,3 +7,9 @@
 [submodule "rpg/public/js/qtjs"]
 	path = rpg/public/js/qtjs
 	url = git@github.com:jgardner1/qtjs.git
+[submodule "rpg/public/qooxdoo"]
+	path = rpg/public/qooxdoo
+	url = https://github.com/qooxdoo/qooxdoo.git
+[submodule "rpg/public/rpg"]
+	path = rpg/public/rpg
+	url = /home/jgardner/Projects/rpg_qooxdoo

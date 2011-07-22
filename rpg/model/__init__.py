@@ -7,7 +7,7 @@ def init_model(engine):
 
 def populate_schema():
     if meta.Session.query(Universe).count() == 0:
-        starting_world = MudObj()
+        starting_world = Mob()
         starting_world.name = 'Starting World'
         starting_world.description = "A vast, limitless world with no end"
         universe = Universe('main', starting_world)
@@ -62,34 +62,52 @@ class Account(Base):
             mobs=self.mobs,
         )
 
-class MudObj(Base):
-    __tablename__ = 'mudobjs'
+    def get_mob(self, mob_id):
+        return meta.Session.query(Mob)\
+            .filter(Mob.id == mob_id)\
+            .filter(Mob.account == self).one()
+        
+class Mob(Base):
+    __tablename__ = 'mobs'
 
     id = Column(GUID, primary_key=True, default=uuid4)
     account_id = Column(GUID, ForeignKey('accounts.id'))
-    account = relationship(Account,
-        backref=backref('mobs',
-            collection_class=mapped_collection(lambda o: str(o.id))))
+    account = relationship(Account, backref=backref('mobs'))
 
     name = Column(Unicode)
     description = Column(Unicode)
 
-    # Contents of rooms
-    container_id = Column(GUID, ForeignKey('mudobjs.id'))
+    container_id = Column(GUID, ForeignKey('mobs.id'))
 
     # Exits
-    source_id = Column(GUID, ForeignKey('mudobjs.id'))
-    dest_id = Column(GUID, ForeignKey('mudobjs.id'))
+    source_id = Column(GUID, ForeignKey('mobs.id'))
+    dest_id = Column(GUID, ForeignKey('mobs.id'))
 
     # Mobs
     god = Column(Boolean)
     ai = Column(String)
+    ai_state = Column(String)
 
-    # Size is the radius of the object, in meters
+    # Items
+    # Where the item is equipped, if it is equipped at all.
+    equip_position = Column(String)
+
+    # In which order the equipment was equipped. 0 was equipped first, 1
+    # second, etc... When you remove equipment, you have to reverse the order.
+    equip_order = Column(Integer)
+
+    # mass is in kg
+    mass = Column(Float)
+
+    # Size is the diameter of the object, in meters. Cross section area is about
+    # pi*size**2/4, while volume is pi*size**3/6
     size = Column(Float) 
+
+    # interior_size is how big the item is on the inside. it works like size.
     interior_size = Column(Float)
 
-    # x,y are the position of the object, in meters
+    # x,y are the position of the object, in meters, inside the room it
+    # belongs to
     x = Column(Float)
     y = Column(Float)
 
@@ -107,6 +125,9 @@ class MudObj(Base):
         'exits',
         'god',
         'ai',
+        'equip_position',
+        'equip_order',
+        'mass',
         'size',
         'interior_size',
         'x',
@@ -126,8 +147,7 @@ class MudObj(Base):
             if attr in skip and attr not in show:
                 continue
             val = getattr(self, attr)
-            if val is not None:
-                d[attr] = val
+            d[attr] = val
         return d
 
     def __init__(self, **attrs):
@@ -156,7 +176,7 @@ class MudObj(Base):
             setattr(self, attr, val)
 
     def clone(self):
-        new_obj = MudObj()
+        new_obj = Mob()
         for attr in self._attrs:
             if attr in ('id'):
                 continue
@@ -168,34 +188,63 @@ class MudObj(Base):
         for exit in room.exits:
             if exit.id == exit_id:
                 self.container_id = exit.dest_id
-                return
-        raise ValueError("no such exit %s" % (exit_id,))
+                break
+        else:
+            raise ValueError("no such exit %s" % (exit_id,))
+
+    def look(self):
+        room = self.container
+        return room.__json__(show=set(('contents', 'exits')))
+
+    def examine(self, id):
+        room = self.container
+        for item in room.contents:
+            if item.id == id:
+                return item
+
+        for exit in room.exits:
+            if exit.id == id:
+                return exit
+
+        for item in self.contents:
+            if item.id == id:
+                return item
+
+    def inventory(self):
+        return self.__json__(show=set(('contents')))
+
+    def pickup(self, id):
+        room = self.container
+        for item in room.contents:
+            if item.id == id:
+                item.container = self
+                return item
+        raise ValueError("%s is not in the room" % (id,))
 
     def __getstate__(self):
         return dict(
             id=self.id,
             _sa_instance_state=self._sa_instance_state)
 
+Mob.container = relationship(Mob,
+    primaryjoin=Mob.id==Mob.container_id,
+    remote_side=Mob.id);
 
-MudObj.container = relationship(MudObj,
-    primaryjoin=MudObj.id==MudObj.container_id,
-    remote_side=MudObj.id);
+Mob.contents = relationship(Mob,
+    primaryjoin=Mob.container_id==Mob.id,
+    remote_side=Mob.container_id)
 
-MudObj.contents = relationship(MudObj,
-    primaryjoin=MudObj.container_id==MudObj.id,
-    remote_side=MudObj.container_id)
+Mob.dest = relationship(Mob,
+    primaryjoin=Mob.dest_id==Mob.id,
+    remote_side=Mob.id)
 
-MudObj.dest = relationship(MudObj,
-    primaryjoin=MudObj.dest_id==MudObj.id,
-    remote_side=MudObj.id)
+Mob.source = relationship(Mob,
+    primaryjoin=Mob.source_id==Mob.id,
+    remote_side=Mob.id)
 
-MudObj.source = relationship(MudObj,
-    primaryjoin=MudObj.source_id==MudObj.id,
-    remote_side=MudObj.id)
-
-MudObj.exits = relationship(MudObj,
-    primaryjoin=MudObj.source_id==MudObj.id,
-    remote_side=MudObj.source_id)
+Mob.exits = relationship(Mob,
+    primaryjoin=Mob.source_id==Mob.id,
+    remote_side=Mob.source_id)
     
 
 class Universe(Base):
@@ -206,8 +255,8 @@ class Universe(Base):
     name = Column(Unicode)
     description = Column(Unicode)
 
-    starting_world_id = Column(GUID, ForeignKey(MudObj.id), nullable=False)
-    starting_world = relationship(MudObj)
+    starting_world_id = Column(GUID, ForeignKey(Mob.id), nullable=False)
+    starting_world = relationship(Mob)
 
     def __init__(self, id, starting_world):
         self.id = id
