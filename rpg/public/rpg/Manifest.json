@@ -1,0 +1,34 @@
+{
+  "info" : 
+  {
+    "name" : "RPG Qooxdoo Interface",
+
+    "summary" : "A Qooxdoo interface to the RPG game",
+    "description" : "This app is a basic web-based interface written in Qooxdoo for RPG..",
+    
+    "homepage" : "http://jonathangardner.net/rpg/",
+
+    "license" : "GPL v3",
+    "authors" : 
+    [
+      {
+        "name" : "Jonathan Gardner (jgardner)",
+        "email" : "jgardner@jonathangardner.net"
+      }
+    ],
+
+    "version" : "trunk",
+    "qooxdoo-versions": ["1.5"]
+  },
+  
+  "provides" : 
+  {
+    "namespace"   : "rpg",
+    "encoding"    : "utf-8",
+    "class"       : "source/class",
+    "resource"    : "source/resource",
+    "translation" : "source/translation",
+    "type"        : "application"
+  }
+}
+
